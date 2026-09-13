@@ -8,7 +8,7 @@ installStorageShim();
 
 const root = document.getElementById('life-rpg-root');
 
-  const CLAUDE_MODEL = 'claude-sonnet-5';
+  const GEMINI_MODEL = 'gemini-2.0-flash';
   const STATS = [
     { key: 'STR', name: '활력', color: 'var(--str)' },
     { key: 'INT', name: '지력', color: 'var(--int)' },
@@ -48,6 +48,7 @@ const root = document.getElementById('life-rpg-root');
   let badges = null; // [{id, stat, tier, label, date}]
   let log = null;
   let aiSuggestions = [];
+  let lastMemoText = '';
   let aiState = 'idle';
   let onboardState = 'idle';
   let tierRegenState = {}; // { STR: 'loading'|'error' }
@@ -140,24 +141,27 @@ const root = document.getElementById('life-rpg-root');
     }
   }
 
-  async function callClaude(system, userContent, maxTokens) {
+  async function callAI(system, userContent, maxTokens, fallbackText) {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error('NO_API_KEY');
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(apiKey);
+    const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: userContent }] })
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: 'user', parts: [{ text: userContent }] }],
+        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.9 }
+      })
     });
     if (!res.ok) {
       const errText = await res.text();
       throw new Error('API_ERROR ' + res.status + ': ' + errText.slice(0, 200));
     }
-    return res.json();
+    const data = await res.json();
+    const cand = data && data.candidates && data.candidates[0];
+    const text = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
+    return (text || fallbackText || '').replace(/```json|```/g, '').trim();
   }
 
   const DECAY_THRESHOLD = 3; // 방치 며칠부터 레벨 하락
@@ -397,10 +401,7 @@ const root = document.getElementById('life-rpg-root');
         '이전 루틴: ' + prevNames.join(', ') + '. ' + dirText + ' ' +
         '30분 이내로 끝나는 새 루틴 2개와 오버드라이브 1개를 제안한다. EXP 숫자는 신경쓰지 않아도 된다. ' +
         '반드시 JSON만 출력. 형식: {"routine":[{"name":"..."},{"name":"..."}],"overdrive":[{"name":"..."}]}';
-      const data = await callClaude(sys, '새 루틴을 제안해줘.', 600);
-      const textBlock = (data.content || []).find(c => c.type === 'text');
-      let raw = textBlock ? textBlock.text : '{}';
-      raw = raw.replace(/```json|```/g, '').trim();
+      let raw = await callAI(sys, '새 루틴을 제안해줘.', 600, '{}');
       const cfg = JSON.parse(raw);
       routine[stat] = (cfg.routine || []).slice(0, 4).map((it, i) => ({
         id: 'r' + Date.now() + i, name: String(it.name).slice(0, 60), exp: rExp + (i === 1 ? 4 : 0)
@@ -478,6 +479,7 @@ const root = document.getElementById('life-rpg-root');
     const input = root.querySelector('#ai-input');
     const text = input ? input.value.trim() : '';
     if (!text) return;
+    lastMemoText = text;
     aiState = 'loading';
     aiSuggestions = [];
     render();
@@ -489,10 +491,7 @@ const root = document.getElementById('life-rpg-root');
         'EXP는 난이도에 비례해 10~90 사이에서 정한다. ' +
         '반드시 JSON 배열만 출력한다. 다른 설명, 마크다운, 코드블록 표시 없이 순수 JSON만. ' +
         '형식: [{"stat":"STR","name":"...","exp":20}, ...]';
-      const data = await callClaude(sys, text, 1000);
-      const textBlock = (data.content || []).find(c => c.type === 'text');
-      let raw = textBlock ? textBlock.text : '[]';
-      raw = raw.replace(/```json|```/g, '').trim();
+      let raw = await callAI(sys, text, 1000, '[]');
       const parsed = JSON.parse(raw);
       aiSuggestions = parsed.filter(p => STATS.some(s => s.key === p.stat)).map((p, i) => ({
         id: 'ai' + Date.now() + i, stat: p.stat,
@@ -623,10 +622,7 @@ const root = document.getElementById('life-rpg-root');
         '{"routine":{"STR":[{"name":"..."},{"name":"..."}],"INT":[...],"CRE":[...],"CHA":[...],"WIS":[...],"GLD":[...]},' +
         '"overdrive":{"STR":[{"name":"..."}],"INT":[...],"CRE":[...],"CHA":[...],"WIS":[...],"GLD":[...]},' +
         '"subquests":[{"stat":"STR","name":"...","exp":N}]}';
-      const data = await callClaude(sys, text, 2000);
-      const textBlock = (data.content || []).find(c => c.type === 'text');
-      let raw = textBlock ? textBlock.text : '{}';
-      raw = raw.replace(/```json|```/g, '').trim();
+      let raw = await callAI(sys, text, 2000, '{}');
       const cfg = JSON.parse(raw);
 
       STATS.forEach(s => {
@@ -674,6 +670,43 @@ const root = document.getElementById('life-rpg-root');
     render();
   }
 
+  function applyNewKeyAndRetry(trimmed) {
+    setApiKey(trimmed);
+    showToast(trimmed ? 'API 키가 저장됐어요 · 이어서 진행할게요' : 'API 키가 삭제됐어요');
+    if (!trimmed) { render(); return; }
+
+    // 키가 막 등록됐다면, 방금 막혔던 작업이 있는지 확인해서 자동으로 재시도한다.
+    if (onboardState === 'nokey') {
+      onboardState = 'idle';
+      generateFromAnswers();
+      return;
+    }
+    if (aiState === 'nokey') {
+      aiState = 'idle';
+      const input = root.querySelector('#ai-input');
+      if (input && lastMemoText) input.value = lastMemoText;
+      if (lastMemoText) { parseWithAI(); return; }
+    }
+    const stuckStat = STATS.find(s => tierRegenState[s.key] === 'nokey');
+    if (stuckStat) {
+      delete tierRegenState[stuckStat.key];
+      recalibrateRoutine(stuckStat.key);
+      return;
+    }
+    render();
+  }
+
+  function apiKeyGuideHtml() {
+    return '<div class="ai-hint" style="margin-top:2px;">' +
+        '1. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700;">Google AI Studio</a>에서 무료로 키 발급 (Get API key 클릭)<br/>' +
+        '2. AIza로 시작하는 키를 복사해서 아래에 붙여넣기' +
+      '</div>' +
+      '<div class="add-row" style="margin-top:8px;">' +
+        '<input class="nm-input" id="inline-api-key-input" placeholder="AIza..." style="flex:1;"/>' +
+        '<button onclick="window.__lifeRpg.saveInlineKey()">저장하고 계속하기</button>' +
+      '</div>';
+  }
+
   function renderWizard() {
     if (!wizardOpen) {
       return '<div class="card"><div class="wizard-collapsed">' +
@@ -694,8 +727,8 @@ const root = document.getElementById('life-rpg-root');
     if (onboardState === 'nokey') {
       return '<div class="wizard-card"><div class="wizard-intro-eyebrow">AI 온보딩</div>' +
         '<div class="wizard-intro-title">API 키가 필요해요</div>' +
-        '<div class="ai-hint">설정에서 본인의 Anthropic API 키를 먼저 등록해주세요.</div>' +
-        '<button class="btn-primary" onclick="window.__lifeRpg.openSettings()">API 키 설정하기</button></div>';
+        apiKeyGuideHtml() +
+        '</div>';
     }
     if (wizardStep >= WIZARD_STEPS.length) return '';
 
@@ -834,7 +867,7 @@ const root = document.getElementById('life-rpg-root');
     }).join('') + '<button class="btn-primary" onclick="window.__lifeRpg.aiAdd()">선택한 항목 서브퀘스트로 추가</button>' : '';
 
     const aiStatusBlock = aiState === 'loading' ? '<div class="ai-loading">AI가 분류하는 중…</div>' :
-      aiState === 'nokey' ? '<div class="ai-error">API 키가 없어요. <button class="mini-btn" onclick="window.__lifeRpg.openSettings()">설정하기</button></div>' :
+      aiState === 'nokey' ? ('<div class="ai-error">API 키가 필요해요</div>' + apiKeyGuideHtml()) :
       aiState === 'error' ? '<div class="ai-error">분류에 실패했어요. 다시 시도해주세요.</div>' : '';
 
     const promoCandidates = getPromotionCandidates();
@@ -853,7 +886,7 @@ const root = document.getElementById('life-rpg-root');
         return '<div class="promo-banner"><div class="promo-title">✨ ' + c.name + ' 루틴을 티어 ' + c.tier + '로 재조정하는 중…</div></div>';
       }
       if (tierRegenState[c.stat] === 'nokey') {
-        return '<div class="promo-banner"><div class="promo-title">🔑 API 키가 없어서 재조정할 수 없어요.</div><div class="promo-actions"><button class="promo-accept" onclick="window.__lifeRpg.openSettings()">API 키 설정하기</button></div></div>';
+        return '<div class="promo-banner"><div class="promo-title">🔑 API 키가 필요해요</div>' + apiKeyGuideHtml() + '</div>';
       }
       if (c.direction === 'up') {
         return '<div class="promo-banner">' +
@@ -986,11 +1019,15 @@ const root = document.getElementById('life-rpg-root');
     retryGenerate: function() { onboardState = 'idle'; render(); },
     openSettings: function() {
       const cur = getApiKey();
-      const val = window.prompt('Anthropic API 키를 입력하세요 (console.anthropic.com 에서 발급, sk-ant-... 형식). 이 브라우저에만 저장되고 서버로 전송되지 않아요.', cur);
+      const val = window.prompt('Gemini API 키를 입력하세요 (Google AI Studio에서 발급, AIza... 형식). 이 브라우저에만 저장되고 서버로 전송되지 않아요.', cur);
       if (val === null) return;
-      setApiKey(val.trim());
-      showToast(val.trim() ? 'API 키가 저장됐어요' : 'API 키가 삭제됐어요');
-      render();
+      applyNewKeyAndRetry(val.trim());
+    },
+    saveInlineKey: function() {
+      const input = root.querySelector('#inline-api-key-input');
+      const val = input ? input.value.trim() : '';
+      if (!val) { showToast('키를 먼저 붙여넣어주세요'); return; }
+      applyNewKeyAndRetry(val);
     },
   };
 
