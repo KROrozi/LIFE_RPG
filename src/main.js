@@ -1,5 +1,6 @@
 // 인생 RPG 시스템 — 메인 앱 로직
 // (claude.ai 아티팩트에서 만든 것을 독립 프로젝트로 옮긴 버전)
+// build: v0.2.0 (2026-09-13) — 화면 우측 하단에도 이 버전이 표시됩니다.
 
 import { installStorageShim } from './lib/storageShim.js';
 import { getApiKey, setApiKey, hasApiKey } from './lib/apiKey.js';
@@ -8,6 +9,7 @@ installStorageShim();
 
 const root = document.getElementById('life-rpg-root');
 
+  const APP_VERSION = 'v0.2.0';
   const GEMINI_MODEL = 'gemini-3.6-flash';
   const STATS = [
     { key: 'STR', name: '활력', color: 'var(--str)' },
@@ -31,6 +33,7 @@ const root = document.getElementById('life-rpg-root');
     { key: 'finance', type: 'choice', q: '재정 관리 습관은 어떤가요?', options: ['전혀 안 함', '가끔 확인', '꾸준히 기록', '체계적으로 관리'] },
     { key: 'weakStat', type: 'multi', q: '6개 영역 중 신경 쓰고 싶은 건? (복수 선택 가능)', sub: '하나 이상 고르면 그 영역 루틴을 더 알차게 짜줘요', options: ['활력 STR', '지력 INT', '창의 CRE', '소셜 CHA', '멘탈 WIS', '자원 GLD'] },
     { key: 'goal', type: 'text', q: '요즘 가장 신경 쓰는 목표는?', sub: '있다면 구체적으로 — 이걸 바탕으로 서브퀘스트를 만들어줘요', ph: '예: 포트폴리오 사이트 완성', optional: true },
+    { key: 'nickname', type: 'text', q: '이 캐릭터의 닉네임을 정해주세요', sub: '나중에 프로필에서 언제든 바꿀 수 있어요', ph: '예: 다검', optional: true },
   ];
 
   let character = null;
@@ -46,10 +49,22 @@ const root = document.getElementById('life-rpg-root');
   let tierRewardGiven = null; // { STR: highestTierRewarded, ... }
   let skipTokens = null; // { STR: count, ... }
   let badges = null; // [{id, stat, tier, label, date}]
+  let profile = null; // { nickname, status, motto }
+  let modalState = null; // { type: 'confirm'|'form', title, desc, fields, confirmLabel, cancelLabel, danger, onConfirm, onCancel }
   let log = null;
   let aiSuggestions = [];
   let lastMemoText = '';
   let lastErrorDetail = '';
+
+
+  function safeJsonParse(raw, fallback) {
+    try { return JSON.parse(raw); } catch (e) {}
+    const lastBrace = Math.max(raw.lastIndexOf('}'), raw.lastIndexOf(']'));
+    if (lastBrace > 0) {
+      try { return JSON.parse(raw.slice(0, lastBrace + 1)); } catch (e) {}
+    }
+    return JSON.parse(fallback);
+  }
 
   function classifyAiError(e) {
     const msg = String((e && e.message) || e || '');
@@ -122,6 +137,7 @@ const root = document.getElementById('life-rpg-root');
     tierRewardGiven = await safeGet('tierRewardGiven', () => { const t = {}; STATS.forEach(s => t[s.key] = 1); return t; });
     skipTokens = await safeGet('skipTokens', () => { const t = {}; STATS.forEach(s => t[s.key] = 0); return t; });
     badges = await safeGet('badges', () => []);
+    profile = await safeGet('profile', () => ({ nickname: '', status: '', motto: '' }));
     log = await safeGet('log', () => []);
 
     wizardOpen = STATS.every(s => routine[s.key].length === 0 && overdrive[s.key].length === 0);
@@ -169,7 +185,8 @@ const root = document.getElementById('life-rpg-root');
     const data = await res.json();
     const cand = data && data.candidates && data.candidates[0];
     const text = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
-    return (text || fallbackText || '').replace(/```json|```/g, '').trim();
+    const cleaned = (text || '').replace(/```json|```/g, '').trim();
+    return cleaned || fallbackText || '{}';
   }
 
   const DECAY_THRESHOLD = 3; // 방치 며칠부터 레벨 하락
@@ -411,8 +428,8 @@ const root = document.getElementById('life-rpg-root');
         '이전 루틴: ' + prevNames.join(', ') + '. ' + dirText + ' ' +
         '30분 이내로 끝나는 새 루틴 2개와 오버드라이브 1개를 제안한다. EXP 숫자는 신경쓰지 않아도 된다. ' +
         '반드시 JSON만 출력. 형식: {"routine":[{"name":"..."},{"name":"..."}],"overdrive":[{"name":"..."}]}';
-      let raw = await callAI(sys, '새 루틴을 제안해줘.', 600, '{}');
-      const cfg = JSON.parse(raw);
+      let raw = await callAI(sys, '새 루틴을 제안해줘.', 1500, '{}');
+      const cfg = safeJsonParse(raw, '{}');
       routine[stat] = (cfg.routine || []).slice(0, 4).map((it, i) => ({
         id: 'r' + Date.now() + i, name: String(it.name).slice(0, 60), exp: rExp + (i === 1 ? 4 : 0)
       }));
@@ -502,8 +519,8 @@ const root = document.getElementById('life-rpg-root');
         'EXP는 난이도에 비례해 10~90 사이에서 정한다. ' +
         '반드시 JSON 배열만 출력한다. 다른 설명, 마크다운, 코드블록 표시 없이 순수 JSON만. ' +
         '형식: [{"stat":"STR","name":"...","exp":20}, ...]';
-      let raw = await callAI(sys, text, 1000, '[]');
-      const parsed = JSON.parse(raw);
+      let raw = await callAI(sys, text, 2000, '[]');
+      const parsed = safeJsonParse(raw, '[]');
       aiSuggestions = parsed.filter(p => STATS.some(s => s.key === p.stat)).map((p, i) => ({
         id: 'ai' + Date.now() + i, stat: p.stat,
         name: String(p.name).slice(0, 80), exp: Math.max(1, parseInt(p.exp, 10) || 10), checked: true
@@ -634,8 +651,8 @@ const root = document.getElementById('life-rpg-root');
         '{"routine":{"STR":[{"name":"..."},{"name":"..."}],"INT":[...],"CRE":[...],"CHA":[...],"WIS":[...],"GLD":[...]},' +
         '"overdrive":{"STR":[{"name":"..."}],"INT":[...],"CRE":[...],"CHA":[...],"WIS":[...],"GLD":[...]},' +
         '"subquests":[{"stat":"STR","name":"...","exp":N}]}';
-      let raw = await callAI(sys, text, 2000, '{}');
-      const cfg = JSON.parse(raw);
+      let raw = await callAI(sys, text, 4000, '{}');
+      const cfg = safeJsonParse(raw, '{}');
 
       STATS.forEach(s => {
         character.stats[s.key] = { level: 0, xp: 0, lastActive: null };
@@ -670,6 +687,10 @@ const root = document.getElementById('life-rpg-root');
       dailyStatus = { date: todayKey(), done: [] };
       await save('dailyStatus', dailyStatus);
 
+      profile.nickname = (wizardAnswers.nickname || '').trim();
+      profile.status = (wizardAnswers.job || '').trim();
+      await save('profile', profile);
+
       onboardState = 'idle';
       wizardOpen = false;
       wizardStep = 0;
@@ -681,6 +702,32 @@ const root = document.getElementById('life-rpg-root');
       if (e.message !== 'NO_API_KEY') lastErrorDetail = String(e.message || e);
     }
     render();
+  }
+
+  function openAdminPasswordModal() {
+    if (adminMode) { adminMode = false; render(); return; }
+    openModal({
+      type: 'form',
+      title: '관리자 모드',
+      desc: '비밀번호를 입력하세요.',
+      fields: [{ key: 'pw', label: '비밀번호', value: '', placeholder: '', type: 'password' }],
+      confirmLabel: '확인',
+      onConfirm: (vals) => {
+        if ((vals.pw || '') === '5951') { adminMode = true; render(); }
+        else { showToast('비밀번호가 틀렸어요'); render(); }
+      },
+    });
+  }
+
+  function openSettingsModal() {
+    openModal({
+      type: 'form',
+      title: 'API 키 설정',
+      desc: '이 브라우저에만 저장되고 서버로 전송되지 않아요.',
+      fields: [{ key: 'apikey', label: 'Gemini API 키', value: getApiKey(), placeholder: 'AIza... 또는 AQ...', type: 'password' }],
+      confirmLabel: '저장',
+      onConfirm: (vals) => applyNewKeyAndRetry((vals.apikey || '').trim()),
+    });
   }
 
   function applyNewKeyAndRetry(trimmed) {
@@ -709,6 +756,51 @@ const root = document.getElementById('life-rpg-root');
     render();
   }
 
+  function openModal(config) {
+    modalState = Object.assign({ type: 'confirm' }, config);
+    render();
+  }
+  function modalCancel() {
+    const m = modalState;
+    modalState = null;
+    if (m && m.onCancel) m.onCancel(); else render();
+  }
+  function modalConfirm() {
+    const m = modalState;
+    if (!m) return;
+    const values = {};
+    if (m.type === 'form') {
+      (m.fields || []).forEach(f => {
+        const el = root.querySelector('#modal-field-' + f.key);
+        values[f.key] = el ? el.value : '';
+      });
+    }
+    modalState = null;
+    if (m.onConfirm) m.onConfirm(values); else render();
+  }
+  function renderModal() {
+    if (!modalState) return '';
+    const m = modalState;
+    const fieldsHtml = m.type === 'form' ? (m.fields || []).map((f, i) =>
+      '<div class="modal-field-wrap">' +
+        '<div class="modal-field-label">' + escapeHtml(f.label) + '</div>' +
+        '<input class="field-input" type="' + (f.type || 'text') + '" id="modal-field-' + f.key + '" value="' + escapeHtml(f.value || '') + '" placeholder="' + escapeHtml(f.placeholder || '') + '" style="width:100%;" ' +
+        (i === (m.fields.length - 1) ? 'onkeydown="if(event.key===\'Enter\') window.__lifeRpg.modalConfirm()"' : '') + '/>' +
+      '</div>'
+    ).join('') : '';
+    return '<div class="modal-overlay" onclick="if(event.target===this) window.__lifeRpg.modalCancel()">' +
+      '<div class="modal-card">' +
+        '<div class="modal-title">' + escapeHtml(m.title || '') + '</div>' +
+        (m.desc ? '<div class="modal-desc">' + escapeHtml(m.desc) + '</div>' : '') +
+        fieldsHtml +
+        '<div class="modal-actions">' +
+          '<button class="modal-btn-cancel" onclick="window.__lifeRpg.modalCancel()">' + (m.cancelLabel || '취소') + '</button>' +
+          '<button class="' + (m.danger ? 'modal-btn-danger' : 'modal-btn-confirm') + '" onclick="window.__lifeRpg.modalConfirm()">' + (m.confirmLabel || '확인') + '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
   function apiKeyGuideHtml() {
     return '<div class="ai-hint" style="margin-top:2px;">' +
         '1. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700;">Google AI Studio</a>에서 무료로 키 발급 (Get API key 클릭)<br/>' +
@@ -720,12 +812,56 @@ const root = document.getElementById('life-rpg-root');
       '</div>';
   }
 
+  function renderProfileCard() {
+    const name = profile.nickname ? escapeHtml(profile.nickname) : '이름 없음';
+    const status = profile.status ? '<div class="ai-hint">' + escapeHtml(profile.status) + '</div>' : '';
+    const motto = profile.motto ? '<div class="ai-hint" style="font-style:italic;">“' + escapeHtml(profile.motto) + '”</div>' : '';
+    return '<div class="card">' +
+      '<div class="section-head"><h2>' + name + '</h2>' +
+        '<button class="btn-small" onclick="window.__lifeRpg.editProfile()">프로필 수정</button>' +
+      '</div>' +
+      status + motto +
+      '<div style="text-align:right;margin-top:10px;">' +
+        '<button class="wizard-skip" onclick="window.__lifeRpg.confirmReset()">캐릭터 재설정</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function editProfile() {
+    openModal({
+      type: 'form',
+      title: '프로필 수정',
+      fields: [
+        { key: 'nickname', label: '닉네임', value: profile.nickname || '', placeholder: '예: 다검' },
+        { key: 'status', label: '현재 상태', value: profile.status || '', placeholder: '예: 취업 준비 중' },
+        { key: 'motto', label: '좌우명', value: profile.motto || '', placeholder: '예: 꾸준함이 답이다' },
+      ],
+      confirmLabel: '저장',
+      onConfirm: (vals) => {
+        profile.nickname = (vals.nickname || '').trim();
+        profile.status = (vals.status || '').trim();
+        profile.motto = (vals.motto || '').trim();
+        save('profile', profile);
+        render();
+      },
+    });
+  }
+
+  function confirmReset() {
+    openModal({
+      type: 'confirm',
+      title: '캐릭터를 재설정할까요?',
+      desc: '지금까지의 레벨, 루틴, 기록이 전부 초기화돼요. 이 작업은 되돌릴 수 없어요.',
+      confirmLabel: '재설정',
+      cancelLabel: '취소',
+      danger: true,
+      onConfirm: () => wizardRestart(),
+    });
+  }
+
   function renderWizard() {
     if (!wizardOpen) {
-      return '<div class="card"><div class="wizard-collapsed">' +
-        '<span class="wizard-collapsed-text">🪄 캐릭터를 다시 설정하고 싶으신가요?</span>' +
-        '<button class="btn-small" onclick="window.__lifeRpg.wizardRestart()">다시 설정</button>' +
-        '</div></div>';
+      return renderProfileCard();
     }
     if (onboardState === 'loading') {
       return '<div class="wizard-card"><div class="wizard-intro-eyebrow">AI 온보딩</div>' +
@@ -941,8 +1077,6 @@ const root = document.getElementById('life-rpg-root');
     }).join('') : '<div class="empty-note">등록된 서브퀘스트가 없어요. 아래 메모 변환에서 만들어보세요.</div>';
 
     root.innerHTML =
-      '<h1>인생 RPG 시스템</h1>' +
-      '<div class="subtitle">캐릭터 시트 · 고정 루틴 · 서브퀘스트</div>' +
       renderWizard() +
       (wizardOpen ? '' :
         '<div class="card">' +
@@ -995,7 +1129,9 @@ const root = document.getElementById('life-rpg-root');
         '<div style="text-align:center;margin-top:8px;">' +
           '<button class="wizard-skip" onclick="window.__lifeRpg.toggleAdmin()">' + (adminMode ? '관리자 모드 끄기' : '관리자 모드') + '</button>' +
         '</div>'
-      );
+      ) +
+      '<div class="version-badge">' + APP_VERSION + '</div>' +
+      renderModal();
   }
 
   window.__lifeRpg = {
@@ -1016,13 +1152,7 @@ const root = document.getElementById('life-rpg-root');
       const days = root.querySelector('#wk-days').value;
       addWeeklyQuest(stat, name, exp, days);
     },
-    toggleAdmin: function() {
-      if (adminMode) { adminMode = false; render(); return; }
-      const pw = window.prompt('관리자 비밀번호를 입력하세요');
-      if (pw === null) return;
-      if (pw === '5951') { adminMode = true; render(); }
-      else { showToast('비밀번호가 틀렸어요'); }
-    },
+    toggleAdmin: openAdminPasswordModal,
     aiParse: parseWithAI,
     aiToggle: toggleAISuggestion,
     aiAdd: addAISuggestions,
@@ -1038,14 +1168,13 @@ const root = document.getElementById('life-rpg-root');
     wizardTextNext: wizardTextNext,
     wizardBack: wizardBack,
     wizardRestart: wizardRestart,
+    editProfile: editProfile,
+    confirmReset: confirmReset,
+    modalCancel: modalCancel,
+    modalConfirm: modalConfirm,
     wizardCollapse: wizardCollapse,
     retryGenerate: function() { onboardState = 'idle'; render(); },
-    openSettings: function() {
-      const cur = getApiKey();
-      const val = window.prompt('Gemini API 키를 입력하세요 (Google AI Studio에서 발급, AIza... 형식). 이 브라우저에만 저장되고 서버로 전송되지 않아요.', cur);
-      if (val === null) return;
-      applyNewKeyAndRetry(val.trim());
-    },
+    openSettings: openSettingsModal,
     saveInlineKey: function() {
       const input = root.querySelector('#inline-api-key-input');
       const val = input ? input.value.trim() : '';

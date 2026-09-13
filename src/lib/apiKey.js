@@ -1,3 +1,4 @@
+// build: v0.2.0 (2026-09-13)
 // 인생 RPG 시스템 — 개인 API 키 관리
 // 서버가 없는 베타 단계라, 사용자의 Gemini(Google AI) API 키를 브라우저에만 저장하고
 // 클라이언트에서 직접 generativelanguage.googleapis.com을 호출합니다.
