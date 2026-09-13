@@ -1,0 +1,221 @@
+
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Roboto+Mono:wght@500;600&display=swap');
+
+  #life-rpg-root {
+    --bg: #F2F4F6;
+    --card: #FFFFFF;
+    --card-soft: #F7F8FA;
+    --text: #191F28;
+    --text-2: #4E5968;
+    --muted: #8B95A1;
+    --border: #E5E8EB;
+    --primary: #3182F6;
+    --primary-soft: #EAF2FE;
+    --mint: #00C2B3;
+    --danger: #F04452;
+    --str: #F04452;
+    --int: #3182F6;
+    --cre: #F5A623;
+    --cha: #FF6B9D;
+    --wis: #6C5CE7;
+    --gld: #00B894;
+    --shadow: 0 2px 12px rgba(25,31,40,0.06);
+    --shadow-md: 0 6px 24px rgba(25,31,40,0.10);
+
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px 16px 60px;
+    border-radius: 20px;
+    max-width: 480px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+  #life-rpg-root * { box-sizing: border-box; }
+  #life-rpg-root .mono { font-family: 'Roboto Mono', monospace; }
+
+  #life-rpg-root h1 {
+    font-size: 22px; font-weight: 900; margin: 0 0 2px; letter-spacing: -0.3px;
+  }
+  #life-rpg-root .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 20px; font-weight: 500; }
+
+  /* ---- Buttons ---- */
+  #life-rpg-root .btn-primary {
+    background: var(--primary); color: #fff; border: none; border-radius: 14px;
+    padding: 14px 18px; font-size: 15px; font-weight: 700; cursor: pointer;
+    font-family: inherit; width: 100%; transition: filter .15s ease, transform .05s ease;
+  }
+  #life-rpg-root .btn-primary:hover { filter: brightness(1.06); }
+  #life-rpg-root .btn-primary:active { transform: scale(0.985); }
+  #life-rpg-root .btn-primary:disabled { background: var(--border); color: var(--muted); cursor: default; }
+  #life-rpg-root .btn-ghost {
+    background: transparent; color: var(--text-2); border: none; font-size: 14px;
+    font-weight: 600; cursor: pointer; font-family: inherit; padding: 8px;
+  }
+  #life-rpg-root .btn-small {
+    background: var(--card-soft); color: var(--text-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 7px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  #life-rpg-root .btn-small:hover { border-color: var(--primary); color: var(--primary); }
+
+  /* ---- Cards / sections ---- */
+  #life-rpg-root .card {
+    background: var(--card); border-radius: 20px; box-shadow: var(--shadow);
+    padding: 20px; margin-bottom: 16px;
+  }
+  #life-rpg-root section { margin-bottom: 16px; }
+  #life-rpg-root .section-head {
+    display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; padding: 0 2px;
+  }
+  #life-rpg-root .section-head h2 { font-size: 15.5px; font-weight: 800; margin: 0; }
+  #life-rpg-root .section-head .meta { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  #life-rpg-root .stat-group-label {
+    font-size: 11.5px; font-weight: 800; margin: 14px 0 6px; padding: 0 2px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  #life-rpg-root .stat-group-label:first-child { margin-top: 0; }
+
+  /* ---- Crest / stats ---- */
+  #life-rpg-root .crest-wrap {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  }
+  #life-rpg-root .crest-svg { flex-shrink: 0; }
+  #life-rpg-root .stat-list { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 10px; }
+  #life-rpg-root .stat-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  #life-rpg-root .stat-tag { font-family: 'Roboto Mono', monospace; font-weight: 700; width: 30px; flex-shrink: 0; font-size: 11.5px; }
+  #life-rpg-root .stat-bar-bg {
+    flex: 1; height: 8px; background: var(--card-soft); border-radius: 999px; overflow: hidden;
+  }
+  #life-rpg-root .stat-bar-fill { height: 100%; border-radius: 999px; transition: width .4s ease; }
+  #life-rpg-root .stat-lv { font-family: 'Roboto Mono', monospace; color: var(--text-2); width: 34px; text-align: right; flex-shrink: 0; font-weight: 600; font-size: 11.5px; }
+  #life-rpg-root .neglect-badge {
+    font-size: 9.5px; font-weight: 700; color: var(--danger);
+    background: #FDEEEF; padding: 2px 6px; border-radius: 999px; flex-shrink: 0;
+  }
+  #life-rpg-root .char-level { text-align: center; padding-left: 6px; }
+  #life-rpg-root .char-level .num { font-size: 30px; font-weight: 900; color: var(--primary); line-height: 1; }
+  #life-rpg-root .char-level .lbl { font-size: 10px; color: var(--muted); font-weight: 700; letter-spacing: .5px; margin-top: 4px; }
+
+  /* ---- Quest cards ---- */
+  #life-rpg-root .quest-card {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--card-soft); border-radius: 16px; padding: 13px 14px; margin-bottom: 8px;
+  }
+  #life-rpg-root .quest-card.done { opacity: 0.5; }
+  #life-rpg-root .quest-card.overdrive { background: #FFF8EB; border: 1px solid #FBE3B0; }
+  #life-rpg-root .quest-check {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 2px solid #D1D6DB; flex-shrink: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; background: #fff; color: transparent; font-weight: 900;
+  }
+  #life-rpg-root .quest-card.done .quest-check { background: var(--primary); border-color: var(--primary); color: #fff; }
+  #life-rpg-root .quest-stat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  #life-rpg-root .quest-name { flex: 1; font-size: 14px; font-weight: 600; }
+  #life-rpg-root .quest-card.done .quest-name { text-decoration: line-through; color: var(--muted); }
+  #life-rpg-root .quest-exp { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--primary); font-weight: 700; flex-shrink: 0; }
+  #life-rpg-root .quest-card.overdrive .quest-exp { color: #C98A0F; }
+  #life-rpg-root .quest-remove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 0 2px; }
+  #life-rpg-root .od-tag {
+    font-size: 9.5px; font-weight: 800; color: #C98A0F; background: #FBE3B0;
+    border-radius: 6px; padding: 2px 5px; flex-shrink: 0;
+  }
+
+  #life-rpg-root .empty-note { color: var(--muted); font-size: 13px; padding: 10px 2px; line-height: 1.6; font-weight: 500; }
+
+  #life-rpg-root details.card { padding: 16px 20px; }
+  #life-rpg-root summary { cursor: pointer; font-size: 14.5px; font-weight: 800; outline: none; }
+  #life-rpg-root .pool-stat-block { margin-top: 16px; }
+  #life-rpg-root .pool-stat-title { font-size: 12px; font-weight: 800; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  #life-rpg-root .pool-item { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  #life-rpg-root .pool-item span.nm { flex: 1; font-weight: 500; }
+  #life-rpg-root .pool-item span.ex { font-family: 'Roboto Mono', monospace; color: var(--primary); font-size: 11px; font-weight: 700; }
+  #life-rpg-root .mini-btn { background: var(--card-soft); border: 1px solid var(--border); color: var(--text-2); border-radius: 8px; padding: 3px 7px; font-size: 10.5px; cursor: pointer; flex-shrink: 0; font-weight: 600; }
+  #life-rpg-root .mini-btn:hover { border-color: var(--primary); color: var(--primary); }
+  #life-rpg-root .add-row { display: flex; gap: 6px; margin-top: 10px; }
+  #life-rpg-root .add-row input, #life-rpg-root .field-input {
+    background: var(--card-soft); border: 1.5px solid var(--border); color: var(--text);
+    border-radius: 12px; padding: 10px 12px; font-size: 13.5px; font-family: inherit;
+  }
+  #life-rpg-root .add-row input:focus, #life-rpg-root .field-input:focus { outline: none; border-color: var(--primary); }
+  #life-rpg-root .add-row input.nm-input { flex: 1; }
+  #life-rpg-root .add-row input.exp-input { width: 64px; }
+  #life-rpg-root .add-row button { background: var(--primary); color: #fff; border: none; border-radius: 12px; padding: 0 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+
+  #life-rpg-root .weekly-add { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  #life-rpg-root .weekly-add select { background: var(--card-soft); border: 1.5px solid var(--border); color: var(--text); border-radius: 12px; padding: 10px 8px; font-size: 12.5px; font-family: inherit; }
+
+  #life-rpg-root .log-item {
+    font-size: 12.5px; color: var(--text-2); padding: 8px 0; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; gap: 8px; font-weight: 500;
+  }
+  #life-rpg-root .log-item .gain { color: var(--primary); font-family: 'Roboto Mono', monospace; font-weight: 700; }
+
+  #life-rpg-root .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: #fff; padding: 12px 20px; border-radius: 14px;
+    font-weight: 700; font-size: 13.5px; box-shadow: var(--shadow-md);
+    z-index: 999; opacity: 0; pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+  }
+  #life-rpg-root .toast.show { opacity: 1; transform: translateX(-50%) translateY(4px); }
+
+  /* ---- AI memo box ---- */
+  #life-rpg-root .ai-box textarea, #life-rpg-root .field-textarea {
+    width: 100%; min-height: 64px; resize: vertical;
+    background: var(--card-soft); border: 1.5px solid var(--border); color: var(--text);
+    border-radius: 14px; padding: 12px; font-size: 13.5px; font-family: inherit; margin-bottom: 10px;
+  }
+  #life-rpg-root .field-textarea:focus, #life-rpg-root .ai-box textarea:focus { outline: none; border-color: var(--primary); }
+  #life-rpg-root .ai-hint { font-size: 12px; color: var(--muted); margin-bottom: 10px; line-height: 1.6; font-weight: 500; }
+  #life-rpg-root .ai-suggest-card {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--primary-soft); border-radius: 14px; padding: 12px; margin-bottom: 8px;
+  }
+  #life-rpg-root .ai-suggest-card input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--primary); flex-shrink: 0; }
+  #life-rpg-root .ai-suggest-meta { flex: 1; }
+  #life-rpg-root .ai-suggest-name { font-size: 13.5px; font-weight: 600; margin-bottom: 2px; }
+  #life-rpg-root .ai-suggest-tags { font-size: 11px; color: var(--text-2); font-weight: 600; }
+  #life-rpg-root .ai-suggest-tags .exp { color: var(--primary); font-family: 'Roboto Mono', monospace; }
+  #life-rpg-root .ai-loading, #life-rpg-root .ai-error { font-size: 12.5px; padding: 8px 2px; font-weight: 600; }
+  #life-rpg-root .ai-loading { color: var(--muted); }
+  #life-rpg-root .ai-error { color: var(--danger); }
+
+  #life-rpg-root .promo-banner {
+    background: #FFF8EB; border-radius: 16px; padding: 14px 16px; margin-bottom: 12px;
+  }
+  #life-rpg-root .promo-title { font-size: 13px; margin-bottom: 10px; line-height: 1.5; font-weight: 600; }
+  #life-rpg-root .promo-title b { color: #C98A0F; }
+  #life-rpg-root .promo-actions { display: flex; gap: 8px; }
+  #life-rpg-root .promo-actions button { border: none; border-radius: 10px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; font-family: inherit; font-weight: 700; }
+  #life-rpg-root .promo-accept { background: #C98A0F; color: #fff; }
+  #life-rpg-root .promo-dismiss { background: transparent; color: var(--muted); }
+
+  /* ---- Onboarding wizard (Toss style) ---- */
+  #life-rpg-root .wizard-card { background: var(--card); border-radius: 24px; box-shadow: var(--shadow-md); padding: 24px 20px; margin-bottom: 16px; }
+  #life-rpg-root .wizard-intro-eyebrow { font-size: 12px; font-weight: 800; color: var(--primary); margin-bottom: 6px; }
+  #life-rpg-root .wizard-intro-title { font-size: 19px; font-weight: 900; line-height: 1.4; margin-bottom: 8px; }
+  #life-rpg-root .wizard-intro-desc { font-size: 13px; color: var(--text-2); line-height: 1.6; margin-bottom: 18px; font-weight: 500; }
+  #life-rpg-root .wizard-progress { display: flex; gap: 4px; margin-bottom: 20px; }
+  #life-rpg-root .wizard-progress .dot { flex: 1; height: 4px; border-radius: 999px; background: var(--border); }
+  #life-rpg-root .wizard-progress .dot.filled { background: var(--primary); }
+  #life-rpg-root .wizard-step-count { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+  #life-rpg-root .wizard-q { font-size: 18px; font-weight: 800; line-height: 1.4; margin-bottom: 4px; }
+  #life-rpg-root .wizard-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; font-weight: 500; }
+  #life-rpg-root .wizard-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+  #life-rpg-root .wizard-opt {
+    background: var(--card-soft); border: 1.5px solid var(--border); border-radius: 14px;
+    padding: 14px 16px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left;
+    transition: border-color .12s ease, background .12s ease;
+  }
+  #life-rpg-root .wizard-opt:hover { border-color: var(--primary); background: var(--primary-soft); }
+  #life-rpg-root .wizard-nav { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  #life-rpg-root .wizard-skip { font-size: 12.5px; color: var(--muted); font-weight: 600; background: none; border: none; cursor: pointer; font-family: inherit; }
+  #life-rpg-root .wizard-back { font-size: 13px; color: var(--muted); font-weight: 700; background: none; border: none; cursor: pointer; font-family: inherit; margin-bottom: 12px; }
+  #life-rpg-root .wizard-review-item { font-size: 12.5px; color: var(--text-2); padding: 6px 0; border-bottom: 1px solid var(--border); font-weight: 500; }
+  #life-rpg-root .wizard-review-item b { color: var(--text); }
+  #life-rpg-root .wizard-collapsed { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  #life-rpg-root .wizard-collapsed-text { font-size: 13px; font-weight: 700; color: var(--text-2); }
+
+  #life-rpg-root .loading { text-align: center; padding: 60px 0; color: var(--muted); font-weight: 600; font-size: 13px; }
