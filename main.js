@@ -173,7 +173,7 @@ const root = document.getElementById('life-rpg-root');
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: userContent }] }],
-        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.9, thinkingConfig: { thinkingBudget: 0 } }
+        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.9 }
       })
     });
     if (!res.ok) {
