@@ -8,7 +8,7 @@ installStorageShim();
 
 const root = document.getElementById('life-rpg-root');
 
-  const GEMINI_MODEL = 'gemini-2.0-flash';
+  const GEMINI_MODEL = 'gemini-3.6-flash';
   const STATS = [
     { key: 'STR', name: '활력', color: 'var(--str)' },
     { key: 'INT', name: '지력', color: 'var(--int)' },
@@ -49,6 +49,14 @@ const root = document.getElementById('life-rpg-root');
   let log = null;
   let aiSuggestions = [];
   let lastMemoText = '';
+  let lastErrorDetail = '';
+
+  function classifyAiError(e) {
+    const msg = String((e && e.message) || e || '');
+    if (msg === 'NO_API_KEY') return 'nokey';
+    if (/\b(401|403)\b|UNAUTHENTICATED|PERMISSION_DENIED|API key not valid|ACCESS_TOKEN_TYPE_UNSUPPORTED/i.test(msg)) return 'keyerror';
+    return 'error';
+  }
   let aiState = 'idle';
   let onboardState = 'idle';
   let tierRegenState = {}; // { STR: 'loading'|'error' }
@@ -179,19 +187,21 @@ const root = document.getElementById('life-rpg-root');
     let changed = false;
     STATS.forEach(s => {
       const st = character.stats[s.key];
+      if (!st.lastActive) return; // 아직 한 번도 시작 안 한 스탯은 방치 판정 대상이 아님
       const d = daysSince(st.lastActive);
       if (d >= DECAY_THRESHOLD) {
         if ((skipTokens[s.key] || 0) > 0) {
           skipTokens[s.key] -= 1;
           st.lastActive = todayKey();
           log.unshift({ date: todayKey(), stat: s.key, exp: 0, name: '스킵권 사용 — 레벨 하락 방지' });
+          changed = true;
         } else if (st.level > 0) {
           st.level -= 1;
           st.xp = 0;
           st.lastActive = todayKey();
           log.unshift({ date: todayKey(), stat: s.key, exp: 0, name: '루틴 방치로 레벨 하락 (Lv.' + (st.level + 1) + ' → Lv.' + st.level + ')' });
+          changed = true;
         }
-        changed = true;
       }
     });
     if (changed) {
@@ -419,7 +429,8 @@ const root = document.getElementById('life-rpg-root');
       showToast(statName + ' 루틴이 티어 ' + tier + '로 재조정됨');
     } catch (e) {
       console.error('tier regen failed', e);
-      tierRegenState[stat] = e.message === 'NO_API_KEY' ? 'nokey' : 'error';
+      tierRegenState[stat] = classifyAiError(e);
+      if (e.message !== 'NO_API_KEY') lastErrorDetail = String(e.message || e);
     }
     render();
   }
@@ -500,7 +511,8 @@ const root = document.getElementById('life-rpg-root');
       aiState = 'idle';
     } catch (e) {
       console.error('AI parse failed', e);
-      aiState = e.message === 'NO_API_KEY' ? 'nokey' : 'error';
+      aiState = classifyAiError(e);
+      if (e.message !== 'NO_API_KEY') lastErrorDetail = String(e.message || e);
     }
     render();
   }
@@ -665,7 +677,8 @@ const root = document.getElementById('life-rpg-root');
       showToast('캐릭터 초기 설정 완료');
     } catch (e) {
       console.error('onboarding failed', e);
-      onboardState = e.message === 'NO_API_KEY' ? 'nokey' : 'error';
+      onboardState = classifyAiError(e);
+      if (e.message !== 'NO_API_KEY') lastErrorDetail = String(e.message || e);
     }
     render();
   }
@@ -675,19 +688,19 @@ const root = document.getElementById('life-rpg-root');
     showToast(trimmed ? 'API 키가 저장됐어요 · 이어서 진행할게요' : 'API 키가 삭제됐어요');
     if (!trimmed) { render(); return; }
 
-    // 키가 막 등록됐다면, 방금 막혔던 작업이 있는지 확인해서 자동으로 재시도한다.
-    if (onboardState === 'nokey') {
+    // 키가 막 등록/교체됐다면, 방금 막혔던 작업이 있는지 확인해서 자동으로 재시도한다.
+    if (onboardState === 'nokey' || onboardState === 'keyerror') {
       onboardState = 'idle';
       generateFromAnswers();
       return;
     }
-    if (aiState === 'nokey') {
+    if (aiState === 'nokey' || aiState === 'keyerror') {
       aiState = 'idle';
       const input = root.querySelector('#ai-input');
       if (input && lastMemoText) input.value = lastMemoText;
       if (lastMemoText) { parseWithAI(); return; }
     }
-    const stuckStat = STATS.find(s => tierRegenState[s.key] === 'nokey');
+    const stuckStat = STATS.find(s => tierRegenState[s.key] === 'nokey' || tierRegenState[s.key] === 'keyerror');
     if (stuckStat) {
       delete tierRegenState[stuckStat.key];
       recalibrateRoutine(stuckStat.key);
@@ -699,10 +712,10 @@ const root = document.getElementById('life-rpg-root');
   function apiKeyGuideHtml() {
     return '<div class="ai-hint" style="margin-top:2px;">' +
         '1. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700;">Google AI Studio</a>에서 무료로 키 발급 (Get API key 클릭)<br/>' +
-        '2. AIza로 시작하는 키를 복사해서 아래에 붙여넣기' +
+        '2. 발급받은 키를 복사해서 아래에 붙여넣기' +
       '</div>' +
       '<div class="add-row" style="margin-top:8px;">' +
-        '<input class="nm-input" id="inline-api-key-input" placeholder="AIza..." style="flex:1;"/>' +
+        '<input class="nm-input" id="inline-api-key-input" placeholder="AIza... 또는 AQ..." style="flex:1;"/>' +
         '<button onclick="window.__lifeRpg.saveInlineKey()">저장하고 계속하기</button>' +
       '</div>';
   }
@@ -718,6 +731,13 @@ const root = document.getElementById('life-rpg-root');
       return '<div class="wizard-card"><div class="wizard-intro-eyebrow">AI 온보딩</div>' +
         '<div class="wizard-intro-title">답변을 바탕으로<br/>캐릭터를 만드는 중이에요</div>' +
         '<div class="ai-loading">잠시만 기다려주세요…</div></div>';
+    }
+    if (onboardState === 'keyerror') {
+      return '<div class="wizard-card"><div class="wizard-intro-eyebrow">AI 온보딩</div>' +
+        '<div class="wizard-intro-title">API 키를 확인해주세요</div>' +
+        '<div class="ai-hint">키가 잘못됐거나 권한이 없는 것 같아요. 새 키로 바꿔보세요.</div>' +
+        apiKeyGuideHtml() +
+        '</div>';
     }
     if (onboardState === 'error') {
       return '<div class="wizard-card"><div class="wizard-intro-eyebrow">AI 온보딩</div>' +
@@ -781,7 +801,7 @@ const root = document.getElementById('life-rpg-root');
       const need = xpNeeded(st.level);
       const pct = Math.min(100, Math.round((st.xp / need) * 100));
       const d = daysSince(st.lastActive);
-      const neglect = d >= DECAY_THRESHOLD ? '<span class="neglect-badge">' + d + '일째</span>' : '';
+      const neglect = (st.lastActive && d >= DECAY_THRESHOLD) ? '<span class="neglect-badge">' + d + '일째</span>' : '';
       const tokens = skipTokens[s.key] > 0 ? '<span class="neglect-badge" style="color:var(--primary);background:var(--primary-soft);">🛡️' + skipTokens[s.key] + '</span>' : '';
       return '<div class="stat-row">' +
         '<span class="stat-tag" style="color:' + s.color + '">' + s.key + '</span>' +
@@ -868,6 +888,7 @@ const root = document.getElementById('life-rpg-root');
 
     const aiStatusBlock = aiState === 'loading' ? '<div class="ai-loading">AI가 분류하는 중…</div>' :
       aiState === 'nokey' ? ('<div class="ai-error">API 키가 필요해요</div>' + apiKeyGuideHtml()) :
+      aiState === 'keyerror' ? ('<div class="ai-error">API 키를 확인해주세요 — 잘못됐거나 권한이 없는 것 같아요.</div>' + apiKeyGuideHtml()) :
       aiState === 'error' ? '<div class="ai-error">분류에 실패했어요. 다시 시도해주세요.</div>' : '';
 
     const promoCandidates = getPromotionCandidates();
@@ -887,6 +908,9 @@ const root = document.getElementById('life-rpg-root');
       }
       if (tierRegenState[c.stat] === 'nokey') {
         return '<div class="promo-banner"><div class="promo-title">🔑 API 키가 필요해요</div>' + apiKeyGuideHtml() + '</div>';
+      }
+      if (tierRegenState[c.stat] === 'keyerror') {
+        return '<div class="promo-banner"><div class="promo-title">🔑 API 키를 확인해주세요 — 잘못됐거나 권한이 없는 것 같아요.</div>' + apiKeyGuideHtml() + '</div>';
       }
       if (c.direction === 'up') {
         return '<div class="promo-banner">' +
@@ -916,13 +940,9 @@ const root = document.getElementById('life-rpg-root');
         '</div>';
     }).join('') : '<div class="empty-note">등록된 서브퀘스트가 없어요. 아래 메모 변환에서 만들어보세요.</div>';
 
-    const keyStatus = hasApiKey() ? '✓ 설정됨' : '설정 필요';
     root.innerHTML =
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
-        '<div><h1>인생 RPG 시스템</h1>' +
-        '<div class="subtitle">캐릭터 시트 · 고정 루틴 · 서브퀘스트</div></div>' +
-        '<button class="btn-small" onclick="window.__lifeRpg.openSettings()">⚙ API 키 (' + keyStatus + ')</button>' +
-      '</div>' +
+      '<h1>인생 RPG 시스템</h1>' +
+      '<div class="subtitle">캐릭터 시트 · 고정 루틴 · 서브퀘스트</div>' +
       renderWizard() +
       (wizardOpen ? '' :
         '<div class="card">' +
@@ -960,7 +980,10 @@ const root = document.getElementById('life-rpg-root');
           '<section><details class="card" open>' +
             '<summary>⚙ 퀘스트 풀 관리 (관리자 모드)</summary>' +
             poolBlocks +
-          '</details></section>' : ''
+          '</details></section>' +
+          '<div style="text-align:center;margin-bottom:12px;">' +
+            '<button class="btn-small" onclick="window.__lifeRpg.openSettings()">🔑 API 키 관리 (' + (hasApiKey() ? '✓ 설정됨' : '설정 필요') + ')</button>' +
+          '</div>' : ''
         ) +
         '<section><div class="section-head"><h2>🏅 업적</h2><span class="meta">' + badges.length + '개</span></div><div class="card">' +
           (badges.length ? badges.slice().reverse().slice(0, 20).map(b => {
